@@ -23,9 +23,11 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.android.devbyteviewer.database.getDatabase
 import com.example.android.devbyteviewer.domain.DevByteVideo
 import com.example.android.devbyteviewer.network.DevByteNetwork
 import com.example.android.devbyteviewer.network.asDomainModel
+import com.example.android.devbyteviewer.repository.VideosRepository
 import kotlinx.coroutines.*
 import java.io.IOException
 
@@ -44,25 +46,12 @@ class DevByteViewModel(application: Application) : AndroidViewModel(application)
     /**
      * The data source this ViewModel will fetch results from.
      */
-    // TODO: Add a reference to the VideosRepository class
+    private val videosRepository = VideosRepository(getDatabase(application))
 
     /**
      * A playlist of videos displayed on the screen.
      */
-    // TODO: Replace the MutableLiveData and backing property below to a reference to the 'videos'
-    // TODO: from the VideosRepository
-    /**
-     * A playlist of videos that can be shown on the screen. This is private to avoid exposing a
-     * way to set this value to observers.
-     */
-    private val _playlist = MutableLiveData<List<DevByteVideo>>()
-
-    /**
-     * A playlist of videos that can be shown on the screen. Views should use this to get access
-     * to the data.
-     */
-    val playlist: LiveData<List<DevByteVideo>>
-        get() = _playlist
+    val playlist = videosRepository.videos
 
     /**
      * Event triggered for network error. This is private to avoid exposing a
@@ -95,14 +84,27 @@ class DevByteViewModel(application: Application) : AndroidViewModel(application)
      */
     init {
         // TODO: Replace with a call to the refreshDataFromRepository9) method
-        refreshDataFromNetwork()
+//        refreshDataFromNetwork()
+        refreshDataFromRepository()
     }
 
     /**
      * Refresh data from the repository. Use a coroutine launch to run in a
      * background thread.
      */
-    // TODO: Replace with the refreshDataFromRepository() method
+    private fun refreshDataFromRepository() = viewModelScope.launch {
+        try {
+            videosRepository.refreshVideos()
+            _eventNetworkError.value = false
+            _isNetworkErrorShown.value = false
+
+        } catch (networkError: IOException) {
+            // Show a Toast error message and hide the progress bar.
+            if(playlist.value.isNullOrEmpty())
+                _eventNetworkError.value = true
+        }
+    }
+
     private fun refreshDataFromNetwork() = viewModelScope.launch {
         try {
             val playlist = DevByteNetwork.devbytes.getPlaylist()
